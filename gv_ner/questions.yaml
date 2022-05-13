@@ -1,0 +1,15 @@
+questions:
+- variable: replicas
+  default: 1
+  description: Number of replicas
+  type: int
+  required: true
+  label: Number of replicas
+  min: 1
+  max: 4
+- variable: version
+  default: latest
+  description: Version
+  type: string
+  required: true
+  label: Version

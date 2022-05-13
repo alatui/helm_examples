@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gv_ner
+spec:
+  selector:
+    matchLabels:
+      app: gv_ner
+  replicas: {{ .Values.replicas }}
+  template:
+    metadata:
+      labels:
+        app: gv_ner
+    spec:
+      containers:
+      - name: nginx
+        image: wouterm/helloworld:{{ .Values.version }}
+        env:
+          - name: MSG
+            value: "NER Model example"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        ports:
+        - containerPort: 80
