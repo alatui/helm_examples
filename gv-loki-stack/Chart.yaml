@@ -1,0 +1,14 @@
+apiVersion: "v1"
+name: gv-loki-stack
+version: 2.6.4
+appVersion: v2.4.2
+kubeVersion: "^1.10.0-0"
+description: "GV Loki: like Prometheus, but for logs."
+home: https://www.getvisibility.com/
+icon: https://www.getvisibility.com/wp-content/themes/getvisibility-site/inc/img/homepage/goldprintbigright.png
+sources:
+- https://github.com/grafana/loki
+maintainers:
+- name: Loki Maintainers
+  email: lokiproject@googlegroups.com
+engine: gotpl

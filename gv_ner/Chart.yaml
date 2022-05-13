@@ -3,3 +3,5 @@ name: gv_ner
 description: Getvisibility NER Model
 version: 1.0.0
 appVersion: 1.0.0
+home: https://www.getvisibility.com/
+icon: https://www.getvisibility.com/wp-content/themes/getvisibility-site/inc/img/homepage/goldprintbigright.png

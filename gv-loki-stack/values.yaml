@@ -1,0 +1,204 @@
+filebeat:
+  enabled: false
+  filebeatConfig:
+    filebeat.yml: |
+      # logging.level: debug
+      filebeat.inputs:
+      - type: container
+        paths:
+          - /var/log/containers/*.log
+        processors:
+        - add_kubernetes_metadata:
+            host: ${NODE_NAME}
+            matchers:
+            - logs_path:
+                logs_path: "/var/log/containers/"
+      output.logstash:
+        hosts: ["logstash-loki:5044"]
+fluent-bit:
+  enabled: false
+grafana:
+  enabled: false
+  image:
+    tag: 8.3.5
+  sidecar:
+    datasources:
+      enabled: true
+      maxLines: 1000
+logstash:
+  enabled: false
+  filters:
+    main: |-
+      filter {
+        if [kubernetes] {
+          mutate {
+            add_field => {
+              "container_name" => "%{[kubernetes][container][name]}"
+              "namespace" => "%{[kubernetes][namespace]}"
+              "pod" => "%{[kubernetes][pod][name]}"
+            }
+            replace => { "host" => "%{[kubernetes][node][name]}"}
+          }
+        }
+        mutate {
+          remove_field => ["tags"]
+        }
+      }
+  image: grafana/logstash-output-loki
+  imageTag: 1.0.1
+  outputs:
+    main: |-
+      output {
+        loki {
+          url => "http://loki:3100/loki/api/v1/push"
+          #username => "test"
+          #password => "test"
+        }
+        # stdout { codec => rubydebug }
+      }
+loki:
+  enabled: true
+  isDefault: false
+  config:
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 3d
+  persistence:
+    enabled: true
+    size: 5Gi
+prometheus:
+  enabled: false
+  isDefault: false
+promtail:
+  config:
+    lokiAddress: http://{{ .Release.Name }}:3100/loki/api/v1/push
+  enabled: true
+  extraScrapeConfigs:
+    - job_name: kubernetes-pods-app
+      kubernetes_sd_configs:
+        - role: pod
+      pipeline_stages:
+        - match:
+            selector: '{app="rke2-ingress-nginx"}'
+            stages:
+              - regex:
+                  expression: >-
+                    ^(?P<ts_loki>[\d]+-[\d]+-[\d]+T[\d]+:[\d]+:[\d]+.[\d]+-[\d]+:[\d]+)
+                    (?P<output_type>[\w]+) \w (?P<req_source>[^ ]*) [^ ] [^ ]
+                    \[[^ ]+ [^ ]+\] "(?P<request_type>[^ ]+) [^ ]+ [^ ]+
+                    (?P<status_code>[\d]+)
+              - labels:
+                  request_type: null
+                  status_code: null
+      relabel_configs:
+        - action: drop
+          regex: .+
+          source_labels:
+            - __meta_kubernetes_pod_label_name
+        - source_labels:
+            - __meta_kubernetes_pod_label_app
+          target_label: __service__
+        - source_labels:
+            - __meta_kubernetes_pod_node_name
+          target_label: __host__
+        - action: drop
+          regex: ''
+          source_labels:
+            - __service__
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - action: replace
+          replacement: $1
+          separator: /
+          source_labels:
+            - __meta_kubernetes_namespace
+            - __service__
+          target_label: job
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_namespace
+          target_label: namespace
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_name
+          target_label: pod
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_container_name
+          target_label: container
+        - replacement: /var/log/pods/*$1/*.log
+          separator: /
+          source_labels:
+            - __meta_kubernetes_pod_uid
+            - __meta_kubernetes_pod_container_name
+          target_label: __path__
+    - job_name: kubernetes-pods-static
+      kubernetes_sd_configs:
+        - role: pod
+      pipeline_stages:
+        - match:
+            selector: '{container="etcd",namespace="kube-system"}'
+            stages:
+              - regex:
+                  expression: >-
+                    ^(?P<ts_loki>[\d]+-[\d]+-[\d]+T[\d]+:[\d]+:[\d]+.[\d]+-[\d]+:[\d]+)
+                    [\w]+ [\w]+ (?P<message_json>{.*})
+              - json:
+                  expressions:
+                    log_level: level
+                  source: message_json
+              - labels:
+                  log_level: null
+        - match:
+            selector: >-
+              {container=~"kube-apiserver|kube-controller-manager|kube-scheduler",namespace="kube-system"}
+            stages:
+              - regex:
+                  expression: >-
+                    ^(?P<ts_loki>[\d]+-[\d]+-[\d]+T[\d]+:[\d]+:[\d]+.[\d]+-[\d]+:[\d]+)
+                    [\w]+ [\w]+ (?P<log_level>\w)
+              - labels:
+                  log_level: null
+      relabel_configs:
+        - action: drop
+          regex: ''
+          source_labels:
+            - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_label_component
+          target_label: __service__
+        - source_labels:
+            - __meta_kubernetes_pod_node_name
+          target_label: __host__
+        - action: drop
+          regex: ''
+          source_labels:
+            - __service__
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - action: replace
+          replacement: $1
+          separator: /
+          source_labels:
+            - __meta_kubernetes_namespace
+            - __service__
+          target_label: job
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_namespace
+          target_label: namespace
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_name
+          target_label: pod
+        - action: replace
+          source_labels:
+            - __meta_kubernetes_pod_container_name
+          target_label: container
+        - replacement: /var/log/pods/*$1/*.log
+          separator: /
+          source_labels:
+            - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
+            - __meta_kubernetes_pod_container_name
+          target_label: __path__
