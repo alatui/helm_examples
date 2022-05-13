@@ -1,5 +1,5 @@
 apiVersion: v2
-name: gv_ner
+name: gv-ner
 description: Getvisibility NER Model
 version: 1.0.0
 appVersion: 1.0.0
