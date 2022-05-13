@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gv_ner
+  name: gv-ner
 spec:
   selector:
     matchLabels:
-      app: gv_ner
+      app: gv-ner
   replicas: {{ .Values.replicas }}
   template:
     metadata:
       labels:
-        app: gv_ner
+        app: gv-ner
     spec:
       containers:
       - name: nginx
